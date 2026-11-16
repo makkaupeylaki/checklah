@@ -44,7 +44,7 @@ const SCALE = Number(process.env.SCALE || 1);
       await page.waitForSelector(".d-sec");
       await shot("6-website", w > 960);
       await page.goto(BASE + "/#/sources");
-      await page.waitForSelector(".src");
+      await page.waitForSelector(".src"); await page.evaluate(() => window.scrollTo(0, 0));
       await shot("7-sources");
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
       if (overflow) console.log(`OVERFLOW ${theme} ${w}`);
@@ -67,7 +67,7 @@ const SCALE = Number(process.env.SCALE || 1);
       await page.fill("#q", "synthetic fixture beta"); await page.click(".btn-search"); await page.waitForSelector(".res");
       await page.click(".res .btn-quiet"); await page.waitForSelector(".d-sec");
       await shot("9-live-registry", w > 960);
-      await page.goto(LIVE + "/#/sources"); await page.waitForSelector(".src");
+      await page.goto(LIVE + "/#/sources"); await page.waitForSelector(".src"); await page.evaluate(() => window.scrollTo(0, 0));
       await shot("10-live-sources");
       await ctx.close();
     }

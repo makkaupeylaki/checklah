@@ -68,7 +68,34 @@ Run this whole list before every proposed push. "Auto" items are covered by `mak
 - [ ] Manual — Screenshots at 320/390/768/1280 inspected: no clipped filters, overflow or tiny text.
 - [ ] Manual — Copy review: no "safe", "legit", "clean", "scam", "criminal", no confidence %.
 
-## Last run — 16 Nov 2026 (build container, demo data)
+## Stage 2 checklist additions
+
+- [x] Auto — Hosted (non-loopback, or edge `CF-Connecting-IP`) requests fail closed (503) unless `AUTH=local`, for API **and** static assets.
+- [x] Auto — Hosted cookies use `__Host-` prefix, `Secure; HttpOnly; SameSite=Strict; Path=/`.
+- [x] Auto — Sessions are D1 rows keyed by SHA-256 of a 256-bit token; idle (30 min) and absolute (12 h) expiry; per-user revocation via `session_epoch`; disabled users refused.
+- [x] Auto — Session created on one runtime is valid on another sharing the database; logout on one is seen by the other.
+- [x] Auto — Login (5/min per hashed client address) and search (30/min) limits are D1 rows shared across handler instances; limiter keys hold no search text or raw address.
+- [x] Auto — Live Worker on a demo-stamped (or unstamped) database refuses to serve; demo sources cannot be imported into live; live sources cannot be imported into demo.
+- [x] Auto — Record detail is `POST /api/record {id}`; IDs in URL paths → 404; platform request logs contain no names or IDs (checked on `wrangler dev` output).
+- [x] Auto — Every query is bound to one active generation resolved per request; staging/previous rows are invisible; FTS `MATCH` is generation-scoped and built from quoted word tokens only.
+- [x] Auto — Request body ≤ 4 KB, JSON only (415 otherwise), query ≤ 200 chars, ≤ 8 tokens, cursor ≤ 600 chars, ≤ 200 candidates per source, 20 per page.
+- [x] Auto — Imports never write account tables; activation/rollback/chunk writes are guarded so a lost lock or moved pointer aborts the whole batch.
+- [x] Auto — Download policy: https only, exact host allowlist per redirect hop, no IP literals/localhost/private names, no credentials/ports, size/time caps, Content-Length truncation check, 429/5xx bounded retries with Retry-After, 401/403 not retried; ACRA download host list empty → fail closed.
+- [x] Auto — OpenSanctions identity-document numbers never stored; unsafe `sourceUrl` values (javascript:, data:, relative) never rendered as links; source HTML shown as text.
+- [ ] Manual — Remote: none of the above has been checked on Cloudflare (pending deployment approval).
+
+## Last run — Stage 2, 16 Nov 2026 (build container)
+
+| Suite | Result |
+|---|---|
+| Worker tests (`npm test`, local D1 via workerd) | 83 passed, 0 failed |
+| UI (`node web/tests/ui.cjs`, 4 `wrangler dev` runtimes) | 92 passed, 0 failed |
+| Retired Python suite (`make legacy-test`) | 49 passed (run before the port; server code unchanged since) |
+| TypeScript (`tsc` strict, worker + web) | clean |
+| Secret scan (`git grep` for key/secret/password/token literals) | nothing outside tests |
+| Screenshots (Stage 2) | demo 56 + live-fixture 12, both themes; inspected |
+
+## Last run — Stage 1, 16 Nov 2026 (build container, demo data)
 
 | Suite | Result |
 |---|---|

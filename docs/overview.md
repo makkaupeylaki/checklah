@@ -72,10 +72,11 @@ Python server stays in `server/` as a retired reference with its tests; it is no
 
 ## Open questions (owner)
 
-1. (Stage 1 question, still open: Stage 2 proceeded offline with the documentation packet.) Allow the build environment to reach `www.opensanctions.org`, `data.opensanctions.org`,
-   `data.gov.sg`, `api-production.data.gov.sg`, `api-open.data.gov.sg` and `guide.data.gov.sg` so the
-   current docs and schemas can be read before writing the live adapters? (Stage 2 gate.)
-2. Daily OpenSanctions refresh (proposed) or every six hours?
-3. Which always-on machine, if any, should eventually host it (Stage 3)? No new bill without approval.
-4. Which access service for individual allowlisted identities in a future deployment?
-5. Final name.
+1. Upstream access for the live contract checks (ACRA round trip, OpenSanctions metadata). The build
+   container still cannot reach the hosts; the checks can also be run from an operator machine.
+2. Cloudflare plan and existing D1 usage on the account (storage and write allowances are shared).
+3. Remote import path: SQL files, D1 HTTP API, or a paid Worker job (`deployment-handoff.md` §3).
+4. Unattended refresh runtime, or manual CLI imports (monthly ACRA, daily/weekly OpenSanctions).
+5. Access layer in front of the Worker sign-in for invited users.
+6. Whether to delete the retired Stage 1 Python server.
+7. Final name.
