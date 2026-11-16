@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en" data-theme="legacy">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CheckLah</title>
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#0a100e">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a100e'/%3E%3Cpath fill='none' stroke='%23a3e61a' stroke-width='2.4' d='M7 8h11M7 13h7M7 18h5'/%3E%3Ccircle cx='19.5' cy='17.5' r='5.5' fill='none' stroke='%23a3e61a' stroke-width='2.4'/%3E%3Cpath stroke='%23a3e61a' stroke-width='2.8' stroke-linecap='round' d='M23.6 21.6l3.6 3.6'/%3E%3C/svg%3E">
+  <script src="/theme-init.js"></script>
+  <link rel="preload" href="/fonts/ibm-plex-mono-latin-400.woff2" as="font" type="font/woff2" crossorigin>
+</head>
+<body>
+  <a class="skip" href="#q">Skip to search</a>
+  <div id="demo-banner" class="demo-banner" role="note" hidden>
+    <strong>FICTIONAL DEMO DATA</strong>
+    <span>Every record here is invented for testing. Not a real source, person or business.</span>
+  </div>
+
+  <header class="top">
+    <a class="brand" href="#/" aria-label="CheckLah, search">
+      <span class="brand-tile" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none" stroke="currentColor"><path stroke-width="2.4" d="M5 7h12M5 12h7M5 17h5"/><circle cx="18.5" cy="17" r="6" stroke-width="2.4"/><path stroke-width="2.8" stroke-linecap="round" d="M23 21.5l4 4"/></svg>
+      </span>
+      <span class="brand-text">
+        <span class="brand-name">CheckLah</span>
+        <span class="brand-sub">PRIVATE RESEARCH</span>
+      </span>
+    </a>
+    <nav class="top-nav" aria-label="Main">
+      <a href="#/" id="nav-search" class="nav-link">Search</a>
+      <a href="#/sources" id="nav-sources" class="nav-link">Sources</a>
+    </nav>
+    <div class="top-right">
+      <div class="seg seg-theme" role="group" aria-label="Theme">
+        <button type="button" data-theme-set="legacy" aria-pressed="true">Legacy</button>
+        <button type="button" data-theme-set="classic" aria-pressed="false">Classic</button>
+      </div>
+      <div id="account" class="account" hidden>
+        <span id="account-user" class="account-user"></span>
+        <button type="button" id="logout" class="btn-quiet">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Sign in (only when server-side auth is enabled) -->
+    <section id="view-login" class="view view-narrow" hidden aria-labelledby="login-title">
+      <h1 id="login-title" class="h-page">Sign in</h1>
+      <p class="lede">CheckLah is private. Ask the owner for an account.</p>
+      <form id="login-form" class="box form-stack" novalidate>
+        <label class="field-label" for="login-user">Username</label>
+        <input id="login-user" name="username" class="input" autocomplete="username" maxlength="64" required>
+        <label class="field-label" for="login-pass">Password</label>
+        <input id="login-pass" name="password" type="password" class="input" autocomplete="current-password" maxlength="256" required>
+        <p id="login-error" class="msg msg-error" role="alert" hidden></p>
+        <button type="submit" class="btn-primary">Sign in</button>
+      </form>
+    </section>
+
+    <!-- Search -->
+    <section id="view-search" class="view" hidden aria-labelledby="hero-title">
+      <div class="hero">
+        <h1 id="hero-title" class="h-hero">Names match. People may not.</h1>
+        <p class="lede">Search public records. Read the original source.</p>
+      </div>
+
+      <form id="search-form" class="search-box box" role="search" autocomplete="off" novalidate>
+        <div class="search-top">
+          <div class="seg" role="group" aria-label="Search by">
+            <button type="button" data-mode="name" aria-pressed="true">Name</button>
+            <button type="button" data-mode="identifier" aria-pressed="false">Identifier</button>
+          </div>
+          <p id="mode-hint" class="hint">People, companies and aliases. Text match only.</p>
+        </div>
+        <label id="q-label" class="field-label" for="q">Name or company</label>
+        <div class="q-row">
+          <div class="q-wrap">
+            <input id="q" name="q" class="input input-lg" type="search" maxlength="200" spellcheck="false"
+                   autocapitalize="off" autocorrect="off" enterkeyhint="search" aria-describedby="mode-hint">
+            <button type="button" id="q-clear" class="q-clear" aria-label="Clear search" hidden>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6"/></svg>
+            </button>
+          </div>
+          <button type="submit" class="btn-primary btn-search">Search</button>
+        </div>
+
+        <div class="filters">
+          <div class="filter">
+            <label class="field-label" for="country">Country</label>
+            <select id="country" class="input select"><option value="">Any country</option></select>
+          </div>
+          <div class="filter">
+            <span class="field-label" id="topic-label">Topic</span>
+            <div class="seg seg-topic" role="group" aria-labelledby="topic-label">
+              <button type="button" data-topic="any" aria-pressed="true">Any</button>
+              <button type="button" data-topic="sanction" aria-pressed="false">Sanctions</button>
+              <button type="button" data-topic="pep" aria-pressed="false">PEP</button>
+            </div>
+          </div>
+        </div>
+
+        <fieldset class="cats">
+          <legend class="field-label">Category</legend>
+          <div id="cats" class="cat-grid"></div>
+          <ul id="cat-notes" class="cat-notes"></ul>
+        </fieldset>
+      </form>
+
+      <div id="stale" class="stale-list"></div>
+
+      <div class="results-wrap">
+        <div class="results-col">
+          <div id="status" class="status" role="status" aria-live="polite"></div>
+          <div id="state" class="state" hidden></div>
+          <ol id="results" class="results" aria-label="Search results"></ol>
+          <nav id="pager" class="pager" aria-label="Result pages" hidden>
+            <button type="button" id="prev" class="btn-quiet">Previous</button>
+            <span id="page-info"></span>
+            <button type="button" id="next" class="btn-quiet">Next</button>
+          </nav>
+        </div>
+        <aside id="detail" class="detail" hidden aria-labelledby="d-title" tabindex="-1"></aside>
+      </div>
+    </section>
+
+    <!-- Sources -->
+    <section id="view-sources" class="view" hidden aria-labelledby="sources-title">
+      <h1 id="sources-title" class="h-page">Sources</h1>
+      <p class="lede">What CheckLah can and cannot see. Last retrieval is not proof that a source changed.</p>
+      <div id="sources-body"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p class="foot-use"><strong>Personal, non-commercial hobby use only.</strong> Not for work, employer, client or business screening. Not identity verification, not legal advice. Use human review and the original source before any important decision.</p>
+    <p id="foot-attrib" class="foot-attrib"></p>
+    <p class="foot-credit">LUQ TECH.</p>
+  </footer>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
