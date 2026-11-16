@@ -1,0 +1,8 @@
+﻿uen,issuance_agency_desc,uen_status_desc,entity_name,entity_type_desc,uen_issue_date,reg_street_name,reg_postal_code
+T99SY0001A,ACRA,Registered,SYNTHETIC FIXTURE ALPHA PTE. LTD.,Local Company,2019-05-02,FIXTURE STREET 1,018956
+T99SY0002B,ACRA,Deregistered,"SYNTHETIC FIXTURE, BETA & CO",Sole Proprietorship/ Partnership,2001-05,"FIXTURE ""QUOTED"" ROAD",049321
+T99SY0003C,ACRA,Registered,"SYNTHETIC FIXTURE
+GAMMA (MULTI-LINE) LLP",Limited Liability Partnership,2020,,
+T99SY0004D,ACRA,Registered,SYNTHETIC FIXTURE DELTA – ÜNICODE PTE. LTD.,Local Company,not-a-date,FIXTURE AVENUE,
+T99SY0005E,ACRA,Registered,,Local Company,2021-01-01,NAMELESS ROAD,000001
+ODD123,ACRA,Registered,SYNTHETIC FIXTURE NONSTANDARD UEN,Foreign Company,2015-07-07,FIXTURE WAY,123456

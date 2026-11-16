@@ -8,3 +8,10 @@ data/
 *.sqlite
 *.part
 users.json
+.wrangler/
+.wrangler-state/
+worker/.import-tmp/
+worker/dist/
+worker/node_modules/
+.dev.vars
+.bench/

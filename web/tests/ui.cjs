@@ -1,5 +1,6 @@
-// UI tests against real local servers (demo, live-empty, demo+auth). Usage: node tests/ui.cjs
-// Needs: built frontend (npm run build) and the Python venv at ../.venv.
+// UI tests against real local Workers runtimes (`wrangler dev`, workerd + local D1).
+// Scenarios: demo (with rendering probes), live with no imports, live with synthetic fixtures, demo+auth.
+// Usage: node tests/ui.cjs   (needs: npm run build here, npm ci in ../worker)
 const { chromium } = require("playwright");
 const { spawn, execFileSync } = require("child_process");
 const fs = require("fs");
@@ -7,8 +8,7 @@ const os = require("os");
 const path = require("path");
 
 const ROOT = path.resolve(__dirname, "../..");
-const PY = path.join(ROOT, ".venv/bin/python");
-const SERVER = path.join(ROOT, "server");
+const WORKER = path.join(ROOT, "worker");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "checklah-ui-"));
 let failures = 0, passes = 0;
 const procs = [];
@@ -19,29 +19,46 @@ function check(name, cond, extra = "") {
   else { failures++; console.log(`  FAIL ${name} ${extra}`); }
 }
 
-async function startServer(port, env) {
-  const p = spawn(PY, ["-m", "checklah", "serve"], {
-    cwd: SERVER, env: { ...process.env, CHECKLAH_PORT: String(port), CHECKLAH_SEARCH_PER_MINUTE: "1000", ...env }, stdio: ["ignore", "pipe", "pipe"] });
+function cli(args, env = {}) {
+  return execFileSync("node", ["tools/cli.ts", ...args], { cwd: WORKER, env: { ...process.env, ...env }, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+}
+
+async function startServer(port, envName, stateDir, vars = {}) {
+  const varArgs = Object.entries({ SEARCH_PER_MINUTE: "1000", ...vars }).flatMap(([k, v]) => ["--var", `${k}:${v}`]);
+  const p = spawn("npx", ["wrangler", "dev", "--env", envName, "--ip", "127.0.0.1", "--port", String(port), "--persist-to", stateDir, "--show-interactive-dev-session=false", ...varArgs],
+    { cwd: WORKER, env: { ...process.env, CI: "1" }, stdio: ["ignore", "pipe", "pipe"], detached: true }); // own process group
   let log = "";
   p.stdout.on("data", d => (log += d)); p.stderr.on("data", d => (log += d));
   procs.push(p);
-  for (let i = 0; i < 50; i++) {
-    try { const r = await fetch(`http://127.0.0.1:${port}/api/session`); if (r.ok || r.status === 401) return { p, log: () => log }; } catch {}
-    await new Promise(r => setTimeout(r, 100));
+  for (let i = 0; i < 120; i++) {
+    try { const r = await fetch(`http://127.0.0.1:${port}/api/session`); if (r.status === 200 || r.status === 401) return { p, log: () => log }; } catch {}
+    await new Promise(r => setTimeout(r, 250));
   }
   throw new Error("server did not start:\n" + log);
 }
 
 (async () => {
-  const demoData = path.join(tmp, "demo-data");
-  execFileSync(PY, ["-m", "checklah", "import", "all", "--with-probes"], { cwd: SERVER, env: { ...process.env, CHECKLAH_DATA_DIR: demoData, CHECKLAH_MODE: "demo" } });
-  const liveData = path.join(tmp, "live-data");
-  fs.mkdirSync(liveData, { recursive: true });
-  execFileSync(PY, ["-c", `import sys; sys.path.insert(0, ${JSON.stringify(SERVER)}); from checklah.auth import save_user; from pathlib import Path; save_user(Path(${JSON.stringify(path.join(demoData, "users.json"))}), "alice", "correct horse battery")`]);
+  const demoState = path.join(tmp, "demo");
+  cli(["init", "--env", "demo", "--persist-to", demoState]);
+  cli(["import", "demo", "--with-probes", "--env", "demo", "--persist-to", demoState]);
+  const authState = path.join(tmp, "demo-auth");
+  cli(["init", "--env", "demo", "--persist-to", authState]);
+  cli(["import", "demo", "--env", "demo", "--persist-to", authState]);
+  const pw = path.join(tmp, "pw.txt");
+  fs.writeFileSync(pw, "correct horse battery\n", { mode: 0o600 });
+  cli(["add-user", "alice", "--env", "demo", "--persist-to", authState], { CHECKLAH_PASSWORD_FILE: pw });
+  const liveState = path.join(tmp, "live");
+  cli(["init", "--env", "live", "--persist-to", liveState]);
+  const fixState = path.join(tmp, "live-fixtures");
+  cli(["init", "--env", "live", "--persist-to", fixState]);
+  cli(["import", "acra", "--env", "live", "--persist-to", fixState, "--file", "test/fixtures/acra-contract.csv", "--max-reject-ratio", "0.5"]);
+  cli(["import", "opensanctions", "--env", "live", "--persist-to", fixState, "--file", "test/fixtures/os-contract.ndjson", "--max-reject-ratio", "0.1"]);
 
-  const demo = await startServer(18765, { CHECKLAH_DATA_DIR: demoData, CHECKLAH_MODE: "demo", CHECKLAH_AUTH: "off" });
-  const live = await startServer(18766, { CHECKLAH_DATA_DIR: liveData, CHECKLAH_MODE: "live", CHECKLAH_AUTH: "off" });
-  const authd = await startServer(18767, { CHECKLAH_DATA_DIR: demoData, CHECKLAH_MODE: "demo", CHECKLAH_AUTH: "local" });
+  const demo = await startServer(18765, "demo", demoState);
+  const live = await startServer(18766, "live", liveState);
+  const authd = await startServer(18767, "demo", authState, { AUTH: "local", ALLOW_LOOPBACK_NO_AUTH: "false" });
+  const fix = await startServer(18768, "live", fixState);
+  void live;
 
   browser = await chromium.launch();
   const newPage = async (w = 1280) => {
@@ -142,11 +159,11 @@ async function startServer(port, env) {
     await page.click('[data-mode="name"]');
     await page.fill("#q", "zzqx nobody"); await page.click(".btn-search"); await page.waitForFunction(() => { const s = document.getElementById("state"); return !s.hidden && !s.textContent.includes("Searching"); });
     const empty = await page.textContent("#state");
-    check("no-match state wording", empty.includes("No matches in the connected sources.") && empty.includes("This is not proof of a clean record or a safe transaction."));
+    check("no-match state wording", empty.includes("No match in the selected sources and scope.") && empty.includes("This is not proof of a clean record or a safe transaction"));
     await page.route("**/api/search", r => r.fulfill({ status: 500, contentType: "application/json", body: '{"error":"Internal error."}' }));
     await page.click(".btn-search"); await page.waitForSelector(".state-error");
     const err = await page.textContent("#state");
-    check("error state distinct from no-match", err.includes("Search failed") && err.includes("not a no-match") && !err.includes("No matches"));
+    check("error state distinct from no-match", err.includes("Search failed") && err.includes("not a no-match") && !err.includes("No match in"));
     await page.unroute("**/api/search");
 
     // stale banner + sources view
@@ -200,8 +217,51 @@ async function startServer(port, env) {
     check("all categories disabled with reasons", (await page.locator(".cat:disabled").count()) === 4);
     await page.fill("#q", "Orlo Vantrell"); await page.click(".btn-search"); await page.waitForFunction(() => { const s = document.getElementById("state"); return !s.hidden && !s.textContent.includes("Searching"); });
     const t = await page.textContent("#state");
-    check("not-connected state, not a no-match", t.includes("No connected source covers this search") && !t.includes("No matches in the connected"));
+    check("not-connected state, not a no-match", t.includes("No connected source covers this search") && !t.includes("No match in the selected"));
     check("no demo rows in live mode", (await page.locator(".res").count()) === 0);
+    await ctx.close();
+  }
+
+  console.log("live mode with synthetic fixtures (local runtime, not live-source data)");
+  {
+    const { ctx, page, errors } = await newPage();
+    const F = "http://127.0.0.1:18768";
+    await page.goto(F + "/"); await page.waitForSelector(".cat");
+    check("live: no demo banner", await page.isHidden("#demo-banner"));
+    check("live: people + companies enabled", !(await page.locator('[data-cat="person"]').isDisabled()) && !(await page.locator('[data-cat="company"]').isDisabled()));
+    check("live: websites disabled with reason", (await page.locator('[data-cat="website"]').isDisabled()) && (await page.textContent("#cat-notes")).includes("PhishTank"));
+    await page.click('[data-mode="identifier"]');
+    await page.fill("#q", "T99SY0001A"); await page.click(".btn-search"); await page.waitForSelector(".res");
+    check("UEN hits registry and watchlist as separate records", (await page.locator(".res").count()) === 2);
+    check("identifier status wording", (await page.textContent("#status")).includes("not a verdict"));
+    await page.click('[data-mode="name"]');
+    await page.fill("#q", "Fixture Persn Singapore"); await page.click(".btn-search"); await page.waitForSelector(".res");
+    check("possible similar name labelled", (await page.textContent("#results")).includes("Possible similar name"));
+    await page.fill("#q", "Fixture Person Singapore"); await page.click(".btn-search"); await page.waitForSelector(".res");
+    await page.click(".res .btn-quiet"); await page.waitForSelector(".d-sec");
+    const det = await page.textContent("#detail");
+    check("context section with sanction entry", det.includes("Sanction entries") && det.includes("Fixture Authority"));
+    check("related person outside scope not named", det.includes("outside the selected scope") && !det.includes("Fixture Foreign Person"));
+    check("listing date labelled with source field", det.includes("Sanction.listingDate") && det.includes("partial: year and month only"));
+    check("passport number never shown", !det.includes("E0000000X") && det.includes("masked by CheckLah"));
+    check("Singapore link field shown", det.includes("Singapore link (field)"));
+    check("source HTML in reason rendered as text", det.includes("<b>reason</b>") && (await page.locator("#detail b").count()) === 0);
+    await page.keyboard.press("Escape");
+    await page.fill("#q", "SYNTHETIC FIXTURE BETA"); await page.click(".btn-search"); await page.waitForSelector(".res");
+    await page.click(".res .btn-quiet"); await page.waitForSelector(".d-sec");
+    const reg = await page.textContent("#detail");
+    check("registry record: status as supplied, no topics", reg.includes("Deregistered") && !reg.includes("Source topics"));
+    check("registry date is UEN issue date (partial)", reg.includes("UEN issue date") && reg.includes("partial: year and month only"));
+    check("ACRA attribution with licence version", reg.includes("Singapore Open Data Licence version 1.0"));
+    await page.keyboard.press("Escape");
+    await page.fill("#q", "zzqx nobody"); await page.click(".btn-search");
+    await page.waitForFunction(() => { const s = document.getElementById("state"); return !s.hidden && !s.textContent.includes("Searching"); });
+    check("live no-match wording names scope", (await page.textContent("#state")).includes("No match in the selected sources and scope."));
+    await page.goto(F + "/#/sources"); await page.waitForSelector(".src");
+    const src = await page.textContent("#sources-body");
+    check("sources: scope note and upstream check fields", src.includes("Selected sources and scope only") && src.includes("Last upstream check") && src.includes("Content last changed"));
+    check("sources: OpenSanctions scope disclaimer", src.includes("not an official OpenSanctions Singapore feed"));
+    check("no console errors (live)", errors.length === 0, errors.join(" | "));
     await ctx.close();
   }
 
@@ -225,15 +285,17 @@ async function startServer(port, env) {
     await page.fill("#q", "orlo"); await page.click(".btn-search"); await page.waitForSelector(".res");
     await page.click("#logout"); await page.waitForSelector("#view-login:not([hidden])");
     check("sign out returns to login and clears results", (await page.locator(".res").count()) === 0);
+    check("sign out clears the typed search text", (await page.inputValue("#q")) === "");
     check("API locked again after logout", (await page.evaluate(async () => (await fetch("/api/sources")).status)) === 401);
     await ctx.close();
   }
 
-  const logs = demo.log() + authd.log();
-  check("server logs contain no search terms", !/Orlo|Vantrell|bartholomew|markup|zzqx|T99DM|login-verify/i.test(logs));
+  const logs = demo.log() + authd.log() + fix.log();
+  const LEAK = /Orlo|Vantrell|bartholomew|markup|zzqx|T99DM|T99SY|login-verify|Fixture Person|DEMO-P-|NK-fixture/i;
+  check("server logs contain no search terms or record IDs", !LEAK.test(logs), logs.split("\n").filter(l => LEAK.test(l)).slice(0, 5).join(" || "));
 
   await browser.close();
   console.log(`\n${passes} passed, ${failures} failed`);
   process.exitCode = failures ? 1 : 0;
 })().catch(e => { console.error(e); process.exitCode = 1; })
-  .finally(async () => { if (browser) await browser.close().catch(() => {}); procs.forEach(p => p.kill()); fs.rmSync(tmp, { recursive: true, force: true }); });
+  .finally(async () => { if (browser) await browser.close().catch(() => {}); procs.forEach(p => { try { process.kill(-p.pid, "SIGTERM"); } catch {} }); /* npx -> wrangler -> workerd */ fs.rmSync(tmp, { recursive: true, force: true }); });

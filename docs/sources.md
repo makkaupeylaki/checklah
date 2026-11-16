@@ -4,7 +4,23 @@ Not legal advice. Each connector's enablement decision is recorded here before i
 "Date checked" means the official page was actually read on that date; "not read" means the page
 could not be reached and nothing below is from it.
 
-## Build-environment note (16 Nov 2026)
+## Stage 2 update (16 Nov 2026)
+
+The owner supplied an offline documentation packet (OpenSanctions terms/bulk/FtM pages, the ACRA dataset
+page and a live `datastore_search` sample, data.gov.sg download and rate-limit pages, the Singapore Open
+Data Licence, Cloudflare D1/Workers limits). Stage 2 adapters were written against that packet and are
+**fixture-tested only**. The upstream hosts were still unreachable from the build container, so no real
+download was made. Per-field details and unresolved items: `source-contracts.md`.
+
+| Connector | Stage 2 decision |
+|---|---|
+| acra | **Adapter written, fixture-tested.** Not live-verified. Downloads fail closed until the download host is verified. |
+| opensanctions | **Adapter written, fixture-tested.** Singapore-linked subset only. Not live-verified. |
+| phishtank, urlhaus | Not connected (terms not reviewed; no adapter). |
+| sg-public-records | Not connected. |
+| MAS (direct) | Not configured: direct source not verified. |
+
+## Stage 1 build-environment note (16 Nov 2026)
 
 The build container's network policy refused `www.opensanctions.org`, `data.gov.sg`,
 `api-production.data.gov.sg` and `guide.data.gov.sg` (DNS/egress rejected). The brief requires the
@@ -36,8 +52,8 @@ source works.
 | Use restriction | Personal hobby use only (owner confirmed 16 Nov 2026). Any for-profit business use, incl. internal compliance, needs a licence. |
 | Attribution (planned) | "Contains data from OpenSanctions (opensanctions.org), licensed CC BY-NC 4.0. Locally indexed and reformatted by CheckLah; not endorsed by OpenSanctions." Preserve upstream dataset/source attribution per record. |
 | Access mechanism (planned) | Bulk file only; no website scraping; no paid hosted API. Daily refresh proposed; never refetch the full export more often than every 6 h. |
-| Date checked | **Not read** (blocked from build environment) |
-| Decision | **Disabled.** Gate: read current bulk + FtM docs, then implement mapping preserving schema, properties, topics, datasets, IDs, referents. |
+| Date checked | Stage 1: not read. Stage 2: owner's documentation packet dated 16 Nov 2026 (offline) |
+| Decision | Stage 2: **adapter written, fixture-tested, Singapore-linked subset**. Live download and metadata contract pending. |
 
 ## acra — Entities Registered with ACRA (data.gov.sg)
 
@@ -45,11 +61,11 @@ source works.
 |---|---|
 | Dataset | `d_3f960c10fed6145404ca7b821f263b87` — https://data.gov.sg/datasets/d_3f960c10fed6145404ca7b821f263b87/view |
 | Scope (planned) | Entity name, UEN, registry status, entity type and supported registration fields. **No** directors, beneficial ownership, financial health or website ownership. |
-| Licence | Singapore Open Data Licence — https://data.gov.sg/open-data-licence . Excludes personal data and third-party rights; not blanket permission for personal-data use. |
+| Licence | Singapore Open Data Licence v1.0 — https://developers.data.gov.sg/open-data-licence . Excludes personal data and third-party rights; as-is with no accuracy/completeness/timeliness guarantee; has liability/indemnity conditions. |
 | Attribution (planned) | Source/date/link pattern of the licence, e.g. "Contains information from Entities Registered with ACRA accessed on <date> from data.gov.sg, made available under the Singapore Open Data Licence." (exact wording to be confirmed from the licence page) |
 | Access mechanism (planned) | Official bulk CSV download; monthly; no per-search upstream queries; respect rate limits. |
-| Date checked | **Not read** (blocked) |
-| Decision | **Disabled.** Gate: read current schema + download API docs. Status shown as "Registered" (registry status), never "Legit". |
+| Date checked | Stage 1: not read. Stage 2: owner's documentation packet dated 16 Nov 2026 (offline), including a live 1-record API sample |
+| Decision | Stage 2: **adapter written, fixture-tested**. Registered and Deregistered entities shown with the supplied status, never "Legit". Live initiate/poll/download and download host pending. |
 
 ## phishtank / urlhaus — website listings (candidates)
 

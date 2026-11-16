@@ -1,5 +1,9 @@
 # CheckLah — architecture
 
+> **Stage 2 (current):** the served app is a Cloudflare Worker + D1 (`worker/`). Sections below marked
+> "Stage 1" describe the retired Python server kept in `server/` for reference and its tests. The
+> Stage 2 design is in "Stage 2: Workers + D1" at the end of this file.
+
 ```
 browser ──HTTPS/HTTP same origin──▶ FastAPI (127.0.0.1:8765)
   Vite+TS static bundle               ├── /api/*            JSON, no-store, auth + CSRF
@@ -102,3 +106,56 @@ Notes and limits:
 - Broad queries hit the 200-candidates-per-source cap; the UI says so and asks for a narrower search.
 - No transliteration, phonetic or typo-tolerant matching. Next-step option if needed: an
   ICU/transliteration-normalised second name column, or a dedicated matcher; measure before choosing.
+
+## Stage 2: Workers + D1
+
+```
+browser ─same origin─▶ Worker (worker/src/index.ts)            wrangler dev (local) / Workers (later)
+                         ├─ /api/*  auth, CSRF, D1 limiter, no-store, quiet log
+                         ├─ static: env.ASSETS (web/dist) + security headers (run_worker_first)
+                         └─ D1 binding DB ── sources / generations / entities / names / names_fts /
+                                              identifiers / referents ── app_meta (mode stamp)
+                                              users / sessions / rate_limits  (never touched by imports)
+Node CLI (worker/tools/cli.ts) ─getPlatformProxy()─▶ same local D1 state ◀─ streaming adapters
+```
+
+### Generations
+
+All source rows carry `gen` (a global integer). `sources` holds `active_gen` and `previous_gen` per
+source; `generations` holds state (`staging`, `active`, `previous`, `retired`, `failed`), the idempotent
+`import_key` (source + upstream version + checksum), counts and a resume `cursor`.
+
+1. **Lock** — `UPDATE sources SET lock_token=?, lock_expires=? WHERE id=? AND (lock_token IS NULL OR
+   lock_expires < now)`; `changes = 1` means acquired.
+2. **Begin** — reuse an incomplete staging generation with the same import key (resume), or skip with no
+   data writes if the active generation already has that key (unchanged upstream).
+3. **Chunks** — each chunk's inserts *and* the cursor update go in one `batch()` (one transaction), so a
+   chunk is either fully in or not; a retry resumes after the last committed cursor.
+4. **Validate** — counts in D1 equal counts streamed; non-empty; not < 50 % of the active generation
+   (unless explicitly allowed); FTS row count equals name count.
+5. **Activate** — one `batch()`: old previous → retired, active → previous, staging → active, pointers
+   updated. Requests resolve `active_gen` once and use it for every query in that request.
+6. **Cleanup** — retired/failed generations are deleted in bounded batches (FTS rows first), never the
+   active or previous one, and only after a grace period so in-flight reads finish.
+7. **Rollback** — one `batch()` swapping active and previous.
+
+### Search on D1
+
+- Identifier lookups use `identifiers(type, norm, gen)` equality.
+- Exact names use `names(gen, norm)` equality.
+- FTS5 table `names_fts(norm, g)` with `unicode61 remove_diacritics 2`; the generation is an indexed
+  FTS column, so a query is `g : "g<N>" AND norm : "tok" AND norm : "pre"*` built only from
+  word-character tokens and bound as one parameter.
+- Country/topic filters are applied to the bounded candidate set via delimited columns
+  (`,sg,`), avoiding a 2M-row country table.
+- "Possible similar name": only when earlier tiers return few results; reranks at most 300 FTS
+  candidates (3-letter prefix of each query token) with a bounded edit distance. Misses typos in the
+  first three letters (documented false negative).
+
+### Execution model for refresh
+
+Local CLI streams downloads to disk (size/time capped), then parses with bounded memory and writes
+chunks through the D1 binding. A Worker cron cannot be assumed to process a full OpenSanctions export
+and a 2.13M-row CSV within documented limits, so unattended production refresh is a deployment decision
+(see `deployment-handoff.md`). The Worker includes a disabled `scheduled()` handler that only performs
+bounded maintenance (cleanup, check timestamps) when explicitly enabled.

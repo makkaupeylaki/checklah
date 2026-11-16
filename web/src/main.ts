@@ -9,7 +9,7 @@ interface Result {
   matched_name?: string; demo: boolean;
 }
 interface SearchResp {
-  mode: string; results: Result[]; total: number; page: number; pages: number; notice?: string; capped?: boolean; identifier_type?: string;
+  mode: string; results: Result[]; total: number; page_size?: number; next_cursor?: string | null; position?: number; notice?: string; capped?: boolean; identifier_type?: string;
   searched: { id: string; title: string; state: string }[];
   unavailable: { id: string; title: string; state: string; reason?: string }[];
   errors: { id: string; title: string; message: string }[];
@@ -19,21 +19,28 @@ interface Source {
   licence: { name: string; url: string | null }; attribution: string; homepage: string | null; refresh: string;
   demo: boolean; imported_at?: string; upstream_exported_at?: string; upstream_version?: string; rows?: number;
   last_attempt?: string; last_success?: string; last_error?: string | null; last_error_at?: string | null;
+  checked_at?: string | null; last_changed_at?: string | null;
   stale_reasons?: string[]; state_note?: string;
 }
 interface Category { id: string; label: string; enabled: boolean; reason?: string; sources: string[] }
-interface SourcesResp { mode: string; sources: Source[]; categories: Category[]; countries: string[] }
+interface SourcesResp { mode: string; sources: Source[]; categories: Category[]; countries: string[]; scope_note?: string | null }
 interface Detail {
   id: string; resolved_from: string | null; kind: string; schema: string; caption: string; caption_defanged: string | null;
   names: { value: string; type: string }[]; countries: string[]; topics: Tag[];
   datasets: { id: string; title: string }[];
   identifiers: { type: string; label: string; value: string | null; masked: boolean; defanged?: string; scope?: string }[];
-  dates: { type: string; label: string; value: string; precision: string | null }[];
+  dates: { type: string; label: string; value: string; precision: string | null; source_field?: string | null }[];
   links: { label: string; url: string }[];
   properties: { key: string; label: string; value: string }[];
-  provenance: { first_seen?: string; last_change?: string; published?: string };
+  provenance: { first_seen?: string; last_change?: string; published?: string; note?: string | null };
+  context?: {
+    sanctions: { authority: string | null; program: string | null; country: string | null; status: string | null; listing_date: string | null; start_date: string | null; end_date: string | null; reason: string | null; source_url: string | null; datasets: string[] }[];
+    relations: { schema: string | null; role: string | null; other_caption: string | null; other_id: string | null; in_scope: boolean }[];
+    identifications: { schema: string | null; type: string | null; country: string | null }[];
+    incomplete: boolean; note: string | null;
+  } | null;
   source: { id: string; title: string; state: string; stale_reasons: string[]; attribution: string;
-            licence: { name: string; url: string | null }; imported_at?: string; upstream_exported_at?: string };
+            licence: { name: string; url: string | null }; imported_at?: string; upstream_exported_at?: string; upstream_version?: string | null };
   demo: boolean;
 }
 
@@ -115,7 +122,8 @@ const state = {
   mode: "name" as "name" | "identifier",
   topic: "any",
   category: "all",
-  page: 1,
+  page: 0,
+  cursors: [null] as (string | null)[],
   lastQuery: "",
   sources: null as SourcesResp | null,
   openId: null as string | null,
@@ -184,6 +192,7 @@ $("login-form").addEventListener("submit", async e => {
 $("logout").addEventListener("click", async () => {
   try { await api("/api/logout", {}); } catch { /* ignore */ }
   clearResults();
+  q.value = ""; $("q-clear").hidden = true; // clear the typed search text too
   const s = await api<{ csrf: string }>("/api/session").catch(() => null);
   if (s) csrf = s.csrf;
   showLogin();
@@ -222,7 +231,7 @@ function renderCategories() {
     b.addEventListener("click", () => {
       state.category = c.id;
       grid.querySelectorAll(".cat").forEach(x => x.setAttribute("aria-pressed", String((x as HTMLElement).dataset.cat === c.id)));
-      if (state.lastQuery) runSearch(1);
+      if (state.lastQuery) runSearch(0);
     });
     grid.append(b);
   }
@@ -266,6 +275,7 @@ function renderSources() {
   const out: Node[] = [];
   if (s.mode === "demo") out.push(h("div", { class: "banner", role: "note" }, h("strong", {}, "Demo mode. "),
     "Only the fictional demo sources are loaded. Live connectors are listed with their current gate."));
+  if (s.scope_note) out.push(h("div", { class: "banner", role: "note" }, h("strong", {}, "Scope. "), s.scope_note));
   out.push(h("div", { class: "banner", role: "note" }, h("strong", {}, "Use restriction. "),
     "Personal, non-commercial hobby use only. OpenSanctions data is CC BY-NC 4.0: any use inside a for-profit business, including internal compliance, needs a data licence."));
   for (const [title, pred, desc] of groups) {
@@ -293,6 +303,9 @@ function sourceCard(x: Source): HTMLElement {
     rows.push(
       h("dt", {}, "Last upstream export"), dd(fmtTime(x.upstream_exported_at)),
       h("dt", {}, "Last local import"), dd(fmtTime(x.imported_at)),
+      h("dt", {}, "Last upstream check"), dd(fmtTime(x.checked_at)),
+      h("dt", {}, "Content last changed"), dd(fmtTime(x.last_changed_at)),
+      h("dt", {}, "Upstream version"), dd(x.upstream_version),
       h("dt", {}, "Last attempt"), dd(fmtTime(x.last_attempt)),
       h("dt", {}, "Last error"), x.last_error ? h("dd", { class: "msg-error" }, x.last_error) : h("dd", {}, "None"),
       h("dt", {}, "Records"), dd(x.rows != null ? x.rows.toLocaleString("en-SG") : null),
@@ -322,13 +335,13 @@ document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(b => b.addEv
 document.querySelectorAll<HTMLButtonElement>("[data-topic]").forEach(b => b.addEventListener("click", () => {
   state.topic = b.dataset.topic!;
   document.querySelectorAll("[data-topic]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
-  if (state.lastQuery) runSearch(1);
+  if (state.lastQuery) runSearch(0);
 }));
-$("country").addEventListener("change", () => { if (state.lastQuery) runSearch(1); });
+$("country").addEventListener("change", () => { if (state.lastQuery) runSearch(0); });
 q.addEventListener("input", () => { $("q-clear").hidden = !q.value; });
 $("q-clear").addEventListener("click", () => { q.value = ""; $("q-clear").hidden = true; clearResults(); q.focus(); });
-$("search-form").addEventListener("submit", e => { e.preventDefault(); state.lastQuery = q.value; runSearch(1); });
-$("prev").addEventListener("click", () => runSearch(state.page - 1));
+$("search-form").addEventListener("submit", e => { e.preventDefault(); state.lastQuery = q.value; runSearch(0); });
+$("prev").addEventListener("click", () => runSearch(Math.max(0, state.page - 1)));
 $("next").addEventListener("click", () => runSearch(state.page + 1));
 
 function clearResults() {
@@ -346,6 +359,8 @@ function setState(kind: "empty" | "error" | "notice" | "loading", title: string,
 let seq = 0;
 async function runSearch(page: number) {
   const text = state.lastQuery.trim();
+  if (page === 0) state.cursors = [null]; // new query or filter: restart keyset pagination
+  const cursor = state.cursors[page] ?? null;
   if (!text) { clearResults(); setState("notice", "Enter a name, company, UEN, URL or domain."); return; }
   const my = ++seq;
   closeDetail(false);
@@ -356,7 +371,7 @@ async function runSearch(page: number) {
   let r: SearchResp;
   try {
     r = await api<SearchResp>("/api/search", { q: text, mode: state.mode, category: state.category,
-      country: ($("country") as HTMLSelectElement).value, topic: state.topic, page });
+      country: ($("country") as HTMLSelectElement).value, topic: state.topic, cursor });
   } catch (e) {
     if (my !== seq) return;
     $("results").removeAttribute("aria-busy");
@@ -365,7 +380,8 @@ async function runSearch(page: number) {
     return;
   }
   if (my !== seq) return;
-  state.results = r; state.page = r.page;
+  state.results = r; state.page = page;
+  state.cursors[page + 1] = r.next_cursor ?? null;
   $("results").removeAttribute("aria-busy");
   renderResults(r);
 }
@@ -393,8 +409,8 @@ function renderResults(r: SearchResp) {
   if (r.total === 0) {
     const el = $("state");
     if (!r.errors.length) {
-      setState("empty", "No matches in the connected sources.",
-        ["This is not proof of a clean record or a safe transaction.", `Searched: ${searched}.`,
+      setState("empty", "No match in the selected sources and scope.",
+        ["This is not proof of a clean record or a safe transaction, and these sources do not cover everyone.", `Searched: ${searched}.`,
          r.unavailable.length ? `Not searched: ${r.unavailable.map(u => u.title).join(", ")}.` : ""]);
     }
     el.hidden = false;
@@ -402,13 +418,14 @@ function renderResults(r: SearchResp) {
     return;
   }
   $("status").textContent = `${r.total} candidate${r.total === 1 ? "" : "s"} from ${r.searched.length} connected source${r.searched.length === 1 ? "" : "s"} (${searched}). ${r.identifier_type ? "A listing or registry entry is not a verdict." : "A name match is not an identity match."}`;
-  if (r.capped) $("status").textContent += ` Capped at ${200} candidates per source: add more of the name or a filter to narrow it.`;
+  if (r.capped) $("status").textContent += " Results truncated: only the first candidates per source are shown. Add more of the name or a filter to narrow it.";
   list.replaceChildren(...r.results.map(resultRow));
   const pager = $("pager");
-  pager.hidden = r.pages <= 1;
-  $("page-info").textContent = `Page ${r.page} of ${r.pages}`;
-  ($("prev") as HTMLButtonElement).disabled = r.page <= 1;
-  ($("next") as HTMLButtonElement).disabled = r.page >= r.pages;
+  const pages = Math.max(1, Math.ceil(r.total / (r.page_size ?? 20)));
+  pager.hidden = pages <= 1;
+  $("page-info").textContent = `Page ${state.page + 1} of ${pages}`;
+  ($("prev") as HTMLButtonElement).disabled = state.page <= 0;
+  ($("next") as HTMLButtonElement).disabled = !r.next_cursor;
 }
 
 function resultRow(x: Result): HTMLElement {
@@ -447,7 +464,7 @@ async function openDetail(x: Result, opener: HTMLElement) {
   detail.replaceChildren(detailHead(x.caption, x.kind, x.caption_defanged), h("div", { class: "d-body" }, h("p", { class: "small" }, "Loading record…")));
   let d: Detail;
   try {
-    d = await api<Detail>(`/api/record/${encodeURIComponent(x.id)}`);
+    d = await api<Detail>("/api/record", { id: x.id }); // POST: the ID never appears in a URL
   } catch (e) {
     if (state.openId !== x.id) return;
     detail.replaceChildren(detailHead(x.caption, x.kind, x.caption_defanged), h("div", { class: "d-body" }, h("p", { class: "msg msg-error", role: "alert" }, (e as Error).message)));
@@ -496,7 +513,7 @@ function detailBody(d: Detail, x: Result): HTMLElement {
       ["Name", primary.length ? primary.join(" / ") : null],
       ["Aliases", aliases.length ? h("ul", { class: "list" }, ...aliases.map(a => h("li", {}, a.value, " ", h("span", { class: "small" }, `(${aliasLabel[a.type] ?? a.type})`)))) : null],
       ["Countries", d.countries.length ? d.countries.map(countryName).join(", ") : null],
-      ...d.dates.map(dt => [dt.label, fmtDate(dt.value, dt.precision)] as [string, Node]),
+      ...d.dates.map(dt => [dt.label, dt.source_field ? h("span", {}, fmtDate(dt.value, dt.precision), " ", h("span", { class: "small" }, `(field: ${dt.source_field})`)) : fmtDate(dt.value, dt.precision)] as [string, Node]),
       ...(d.kind === "person" && !d.dates.some(x => x.type === "birth") ? [["Date of birth", null] as [string, null]] : []),
       ...d.properties.map(p => [p.label, p.value] as [string, string]),
     ])),
@@ -504,14 +521,17 @@ function detailBody(d: Detail, x: Result): HTMLElement {
       i.masked ? h("span", { class: "small" }, "Supplied by source; masked by CheckLah")
       : i.defanged ? h("span", {}, h("span", { class: "defanged" }, i.defanged), i.scope ? h("span", { class: "small" }, ` (scope: ${i.scope === "exact_url" ? "this exact URL" : i.scope === "host" ? "whole host" : i.scope})`) : "")
       : (i.value ?? null)] as [string, Node | string | null])) : h("p", { class: "small" }, "No identifiers supplied by the source.")),
+    d.context ? contextSection(d.context) : null,
     section("Source", dl([
       ["Source", d.source.title],
       ["Datasets", d.datasets.length ? h("ul", { class: "list" }, ...d.datasets.map(ds => h("li", {}, ds.title || ds.id))) : null],
       ["Original source", d.links.length ? h("ul", { class: "list" }, ...d.links.map(l => h("li", {}, extLink(l.url, l.label)))) : null],
       ["Source status", d.source.state === "stale" ? `Stale: ${d.source.stale_reasons.join("; ")}` : d.source.state === "connected" ? "Connected" : d.source.state],
-      ["First seen by source", d.provenance.first_seen ?? null],
-      ["Last changed at source", d.provenance.last_change ?? null],
+      ["First seen by source (processing)", d.provenance.first_seen ?? null],
+      ["Last changed at source (processing)", d.provenance.last_change ?? null],
+      ...(d.provenance.note ? [["Note", d.provenance.note] as [string, string]] : []),
       ["Upstream export", fmtTime(d.source.upstream_exported_at)],
+      ["Upstream version", d.source.upstream_version ?? null],
       ["Retrieved locally", fmtTime(d.source.imported_at)],
       ["Licence", d.source.licence.url ? extLink(d.source.licence.url, d.source.licence.name) : d.source.licence.name],
       ["Attribution", d.source.attribution || null],
@@ -519,6 +539,35 @@ function detailBody(d: Detail, x: Result): HTMLElement {
     section("Corrections", h("p", { class: "small" }, "If this record is wrong, contact the original publisher above. CheckLah does not accept or publish reports.")),
   );
   return body;
+}
+
+function contextSection(c: NonNullable<Detail["context"]>): HTMLElement {
+  const kids: Node[] = [];
+  if (c.sanctions.length) {
+    kids.push(h("h4", { class: "field-label" }, "Sanction entries (as supplied)"));
+    kids.push(h("ul", { class: "list" }, ...c.sanctions.map(s => h("li", {},
+      [s.authority, s.program].filter(Boolean).join(" — ") || "Authority not supplied",
+      s.country ? ` (${s.country.toUpperCase()})` : "",
+      s.listing_date ? ` · listed ${s.listing_date}` : s.start_date ? ` · from ${s.start_date}` : "",
+      s.end_date ? ` · until ${s.end_date}` : "", s.status ? ` · status: ${s.status}` : "",
+      s.reason ? h("span", { class: "small" }, ` — ${s.reason}`) : "",
+      s.source_url ? h("span", {}, " ", extLink(s.source_url, "source")) : ""))));
+  }
+  if (c.identifications.length) {
+    kids.push(h("h4", { class: "field-label" }, "Identity documents"));
+    kids.push(h("p", { class: "small" }, `${c.identifications.length} document record(s) supplied by the source; numbers are not stored by CheckLah. `,
+      c.identifications.map(i => [i.type || i.schema, i.country?.toUpperCase()].filter(Boolean).join(" ")).join("; ")));
+  }
+  if (c.relations.length) {
+    kids.push(h("h4", { class: "field-label" }, "Relationships (as supplied)"));
+    kids.push(h("ul", { class: "list" }, ...c.relations.map(r => h("li", {},
+      r.schema ?? "Link", r.role ? ` — ${r.role}` : "", ": ",
+      r.other_caption ?? h("span", { class: "none" }, "other party outside the selected scope (not shown)"),
+      r.in_scope ? h("span", { class: "small" }, " (also in scope)") : ""))));
+  }
+  if (!kids.length) kids.push(h("p", { class: "small" }, "No sanction, document or relationship entries found for this record in the selected data."));
+  kids.push(h("p", { class: "small" }, c.note ?? "Context may be incomplete."));
+  return section("Context", ...kids);
 }
 
 boot();

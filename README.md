@@ -1,114 +1,106 @@
 # CheckLah
 
-**Check the source, lah.** A private, local research tool that searches public-source records by a
-person's or company's name (or a Singapore UEN / URL / domain) and links back to the original source.
+**Check the source, lah.** A private research tool that searches public-source records by a person's or
+company's name (or a Singapore UEN / URL / domain) and links back to the original source.
 
 > **Names match. People may not.** CheckLah is a source browser. It is not identity verification,
 > KYC/AML screening or a compliance decision engine. It never decides that a person is a criminal,
-> a company is legitimate or a website is safe. Not legal advice.
+> a company is legitimate or a website is safe. No match means only "No match in the selected sources
+> and scope". Not legal advice.
 
 Working name only: no domain or trademark clearance has been done.
 
 ## Use restriction
 
-**Personal, non-commercial hobby use only** (owner-confirmed 16 Nov 2026). Do not use it for work,
-an employer, clients or business/operational screening. OpenSanctions bulk data is CC BY-NC 4.0, and
-OpenSanctions states that any use inside a for-profit business needs a data licence, including
-internal compliance that produces no revenue. Password protection, no ads and a small audience do
-not change that. If scope changes, pause that use until a licence or permission is settled.
+**Personal, non-commercial hobby use only** (owner-confirmed 16 Nov 2026). Do not use it for work, an
+employer, clients or business/operational screening. OpenSanctions data is CC BY-NC 4.0: any use inside a
+for-profit business, including compliance screening that earns no revenue, needs a data licence.
+Password protection, no ads and a small audience do not change that.
 
-## Status (Stage 1 of 3)
+## Status — Stage 2 (Workers + D1, Singapore-first), local only
 
 | | |
 |---|---|
-| UI + API on **fictional demo data** | Done. Permanent "FICTIONAL DEMO DATA" banner. |
-| OpenSanctions / ACRA live adapters | **Not written.** Their official docs could not be reached from the build environment, and the brief requires reading the current schema first. Connectors are listed in the UI as "Not configured" with that reason. |
-| PhishTank / URLhaus | Not connected until terms are read and recorded. |
-| Singapore court/public records | Reserved category: "Not connected: suitable source and reuse terms required." |
-| Deployment / sharing | **None.** Binds to `127.0.0.1`. Do not share until server-side access is configured and tested. |
+| App runtime | Cloudflare Worker + D1, run **locally** with `wrangler dev`. Not deployed. |
+| Demo | Fictional data, permanent "FICTIONAL DEMO DATA" banner, separate demo database |
+| ACRA (Entities Registered with ACRA) | Adapter written, **fixture-tested only**. Real download not yet run; download host unverified, so it fails closed |
+| OpenSanctions (Singapore-linked subset) | Adapter written, **fixture-tested only**. Real export not yet run |
+| PhishTank / URLhaus / public records / direct MAS | Not connected |
+| Daily refresh | Policy implemented; **disabled** (no cron trigger, `REFRESH_ENABLED=false`) |
 
-See `docs/` for the overview, requirements, architecture (with benchmark), security/QA checklist and
-the sources register.
+Details: `docs/stage2-status.md` (what is verified, at which level), `docs/source-contracts.md`,
+`docs/deployment-handoff.md` (nothing in it has been run).
 
 ## Run locally
 
-Requires Python 3.11+ (with SQLite FTS5) and Node 18+.
+Needs Node ≥ 22.18. No Cloudflare account or credentials are used.
 
 ```sh
-make setup        # venv + pip deps, npm ci
-make build        # frontend -> web/dist
-make demo         # import the fictional demo sources into data/demo/
-make serve        # http://127.0.0.1:8765
+make setup   # npm ci in worker/ and web/ (pinned lockfiles)
+make demo    # create the local demo D1 database (.wrangler-state/demo) and import fictional data
+make serve   # build the UI and serve http://127.0.0.1:8787 via wrangler dev (loopback only)
 ```
 
-Without `make`:
+Live mode with local source files (never fetched automatically):
 
 ```sh
-python3 -m venv .venv && .venv/bin/pip install -r server/requirements.txt
-(cd web && npm ci && npm run build)
-cd server && ../.venv/bin/python -m checklah import all && ../.venv/bin/python -m checklah serve
+cd worker
+node tools/cli.ts init --env live
+node tools/cli.ts import acra --env live --file /path/to/acra.csv [--manifest m.json]
+node tools/cli.ts import opensanctions --env live --file /path/to/entities.ftm.json [--manifest m.json]
+cd .. && make serve-live   # http://127.0.0.1:8788
 ```
 
-Frontend development: run `make serve`, then `cd web && npm run dev` (Vite proxies `/api`).
+`--download` exists for both adapters, but it has not been run against the real sources. ACRA downloads
+refuse to proceed until the real download host is verified (`--trust-download-host <exact host>`).
+
+### CLI (`worker/tools/cli.ts`, local D1 only)
+
+| Command | |
+|---|---|
+| `init --env demo\|live` | apply migrations, stamp the database with its mode |
+| `import demo\|acra\|opensanctions` | stream → validate → chunked, resumable write → atomic activation |
+| `rollback <source>` | swap active and previous generation |
+| `cleanup` | bounded deletion of retired generations, expired sessions, old limiter rows |
+| `status` | source states as the UI shows them |
+| `add-user <name>` / `revoke-user <name>` | scrypt hash in D1; password from TTY, stdin or `CHECKLAH_PASSWORD_FILE` |
 
 ### Optional local sign-in
 
 ```sh
-cd server && ../.venv/bin/python -m checklah add-user alice   # password prompted, argon2id hash in data/users.json
-CHECKLAH_AUTH=local ../.venv/bin/python -m checklah serve
+cd worker && node tools/cli.ts add-user alice --env demo
+npx wrangler dev --env demo --var AUTH:local --var ALLOW_LOOPBACK_NO_AUTH:false --persist-to ../.wrangler-state/demo
 ```
 
-The server refuses to bind a non-loopback address without `CHECKLAH_AUTH=local`. Local sign-in is a
-safeguard for one machine, not a sharing plan; a shared deployment needs individual identities behind
-an access service (Stage 3, owner decision).
-
-### Settings (`CHECKLAH_*`)
-
-| Variable | Default | |
-|---|---|---|
-| `MODE` | `demo` | `demo` loads only fictional sources, `live` only real ones. Never both. |
-| `DATA_DIR` | `./data` | Snapshots live in `<DATA_DIR>/<mode>/<source>/` |
-| `HOST` / `PORT` | `127.0.0.1` / `8765` | |
-| `AUTH` | `off` | `local` = argon2id users file + server-side sessions |
-| `COOKIE_SECURE` | auto | Secure unless loopback |
-| `SESSION_IDLE_MINUTES` / `SESSION_MAX_HOURS` | 30 / 12 | |
-| `LOGIN_PER_MINUTE` / `SEARCH_PER_MINUTE` | 5 / 30 | |
-
-### Importer
-
-```sh
-python -m checklah import <source|all> [--file F] [--sha256 HEX] [--allow-shrink]
-python -m checklah rollback <source>
-python -m checklah status
-python -m checklah bench --rows 1000000
-```
-
-Imports stream, validate, build a new SQLite snapshot and swap atomically. Failed, empty or
-unexpectedly small imports never replace the working snapshot; the previous one is kept for rollback.
+Any non-loopback request is refused (503) unless `AUTH=local`.
 
 ## Tests
 
 ```sh
-make test   # 49 pytest: normalization, search, import/rollback, downloader, auth/CSRF/rate limits, privacy
-make ui     # 72 browser checks: keyboard/focus, labels, XSS probe, states, demo/live, themes, sign-in
-make shots  # screenshots at 320/390/768/1280 in both themes (server must be running)
+make test         # 83 Node tests on local D1 (workerd): normalisation, D1 spike, search, lifecycle faults,
+                  # ACRA + OpenSanctions adapters, API/security, cross-instance sessions
+make ui           # 92 browser checks against real wrangler dev runtimes (demo, live empty, live fixtures, auth)
+make legacy-test  # 49 Stage 1 Python tests (retired reference server)
+make bench        # local synthetic benchmark at ACRA scale (about 2 h)
 ```
 
 ## Design
 
 FlightLah / HarbourLah family: exact Legacy (default) and Classic colour tokens, IBM Plex Mono
-400/500/600/700 self-hosted under the SIL OFL (`web/public/fonts/OFL.txt`), 4px radii, fine rules.
-Coral is used only for sanctions tags and errors; green is never an "all clear".
+400/500/600/700 self-hosted under the SIL OFL (`web/public/fonts/OFL.txt`), 4 px radii, fine rules.
+Coral marks sanctions tags and errors only; green is never an "all clear".
 
 ## Privacy
 
-No analytics, query history, third-party AI, embeddings or enrichment. Searches are `POST` bodies,
-never in URLs. Logs record only method, route template, status and time. API responses are
-`no-store`; no service worker; `noindex`; strict CSP. User-entered URLs are never fetched.
+No analytics, query history, third-party AI, embeddings or enrichment. Searches and record lookups are
+`POST` bodies, never in URLs. Logs record method, route template, status and time only. API responses are
+`no-store`; no service worker; `noindex`; strict CSP. User-entered URLs, listed websites and `sourceUrl`
+values are never fetched.
 
 ## Attribution
 
-Source attribution is shown in the footer and on the Sources view, separate from the credit line.
-Demo data: fictional, part of this project. Planned live sources and their licences: `docs/sources.md`.
+Shown in the footer and on the Sources view, separate from the credit line. ACRA: Singapore Open Data
+Licence v1.0. OpenSanctions: CC BY-NC 4.0, modified (Singapore-linked subset, reformatted, indexed),
+not endorsed. Demo data is fictional.
 
 LUQ TECH.

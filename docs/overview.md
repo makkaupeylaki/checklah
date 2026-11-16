@@ -32,18 +32,20 @@ The restriction is shown in the UI footer, on the Sources view and in the README
 
 | Stage | Content | Status |
 |---|---|---|
-| 1 | Docs + working local UI on **fictional demo data**, FlightLah/HarbourLah family themes | **This build** |
-| 2 | Real read-only adapters (OpenSanctions default bulk, ACRA entities) after use/licence and source-access checks | Blocked: official docs could not be read from the build environment (see `sources.md`) |
-| 3 | Private access/hosting proposal with measured capacity and costs | Not started; owner decision |
+| 1 | Docs + working local UI on **fictional demo data**, FlightLah/HarbourLah family themes | Done (commit fd6e8b9) |
+| 2 | Cloudflare Workers + D1 port; real ACRA and OpenSanctions bulk adapters, Singapore-first | **This build**: code + local tests. Live-source and remote-D1 checks pending (see `stage2-status.md`) |
+| 3 | Private hosting: deploy, first real import, smoke test | Not started; needs the owner's explicit "Push" (see `deployment-handoff.md`) |
 
-Nothing is deployed, registered, purchased or exposed. The server binds to `127.0.0.1` by default.
+Nothing is deployed, registered, purchased or exposed. Stage 2 replaces the Python web server with a
+TypeScript Worker on D1, run locally with `wrangler dev` (no Cloudflare credentials needed). The Stage 1
+Python server stays in `server/` as a retired reference with its tests; it is not the primary app.
 
 ## Source categories
 
 | Category | Intended source | This build |
 |---|---|---|
-| People / Companies (watchlists, sanctions, PEPs) | OpenSanctions default bulk collection | Interface + gated stub; demo data only |
-| Companies (Singapore registry) | ACRA "Entities Registered with ACRA" via data.gov.sg | Interface + gated stub; demo data only |
+| People / Companies (watchlists, sanctions, PEPs) | OpenSanctions default bulk collection, **Singapore-linked subset only** (explicit `sg` country-type properties) | Stage 2: adapter written, fixture-tested; live download pending |
+| Companies (Singapore registry) | ACRA "Entities Registered with ACRA" (`d_3f960c10fed6145404ca7b821f263b87`) | Stage 2: adapter written, fixture-tested; live initiate/poll/download pending |
 | Websites (phishing/malware listings) | Candidates: PhishTank, URLhaus | Interface + demo; production feeds disconnected until terms are recorded |
 | Public records (Singapore) | None chosen | Reserved category: "Not connected: suitable source and reuse terms required" |
 
@@ -56,9 +58,21 @@ Nothing is deployed, registered, purchased or exposed. The server binds to `127.
    are in `architecture.md`.
 5. No phone numbers, no NRIC/passport collection, no crowdsourced reports in this version.
 
+## Stage 2 scope decisions
+
+- **Singapore first.** OpenSanctions is streamed in full but only entities whose own `country`,
+  `nationality`, `citizenship`, `jurisdiction`, `mainCountry` or `birthCountry` property contains `sg`
+  are searchable. This is CheckLah's scope choice, not an official OpenSanctions Singapore feed, and it
+  misses overseas entities relevant to Singapore and indirect links. A Singapore sanctioning authority
+  alone does not make a subject Singapore-linked.
+- **ACRA is a registry**, not an adverse source: Registered and Deregistered entities are shown with the
+  supplied status and never tagged sanctioned/PEP/suspicious.
+- **No match** means "No match in the selected sources and scope", never clear or safe.
+- No direct MAS adapter (not verified); PhishTank/URLhaus stay disconnected; public records stay disabled.
+
 ## Open questions (owner)
 
-1. Allow the build environment to reach `www.opensanctions.org`, `data.opensanctions.org`,
+1. (Stage 1 question, still open: Stage 2 proceeded offline with the documentation packet.) Allow the build environment to reach `www.opensanctions.org`, `data.opensanctions.org`,
    `data.gov.sg`, `api-production.data.gov.sg`, `api-open.data.gov.sg` and `guide.data.gov.sg` so the
    current docs and schemas can be read before writing the live adapters? (Stage 2 gate.)
 2. Daily OpenSanctions refresh (proposed) or every six hours?

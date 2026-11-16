@@ -1,0 +1,31 @@
+{
+  "name": "checklah-worker",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test --test-concurrency=1 test/*.test.ts",
+    "build": "wrangler deploy --dry-run --outdir dist --env demo",
+    "dev:demo": "wrangler dev --env demo --port 8787 --persist-to ../.wrangler-state/demo",
+    "dev:live": "wrangler dev --env live --port 8788 --persist-to ../.wrangler-state/live",
+    "migrate:demo": "wrangler d1 migrations apply DB --local --env demo --persist-to ../.wrangler-state/demo",
+    "migrate:live": "wrangler d1 migrations apply DB --local --env live --persist-to ../.wrangler-state/live",
+    "cli": "node tools/cli.ts",
+    "demo": "node tools/cli.ts init --env demo && node tools/cli.ts import demo --env demo",
+    "bench": "node tools/bench.ts"
+  },
+  "dependencies": {
+    "@noble/hashes": "2.0.1",
+    "csv-parse": "6.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3",
+    "wrangler": "4.156.2"
+  }
+}

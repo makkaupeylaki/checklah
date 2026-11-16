@@ -15,6 +15,17 @@ Run this whole list before every proposed push. "Auto" items are covered by `mak
 | Server | SSRF, local-file reads, SQL/FTS injection | No user-controlled fetching or paths; parameterized SQL; FTS tokens reduced to word characters and quoted |
 | People named in data | Namesake harm, guilt by colour | "May refer to a different person" banner; match reason shown; no percentages; coral only on source/topic tags; PEP ≠ wrongdoing |
 
+## Stage 2 additions to the threat model
+
+| Asset | Threat | Control |
+|---|---|---|
+| Demo/live separation | Live Worker serving demo data | Separate D1 databases/state dirs; `app_meta.mode` stamp checked per request; importer refuses cross-mode sources |
+| Auth state | Process memory lost between isolates | Sessions, CSRF tokens, limiter rows in D1; token hashes only; per-user `session_epoch` revocation |
+| Hosted exposure | Auth off on a public hostname | Auth off requires loopback hostname + `ALLOW_LOOPBACK_NO_AUTH=true` + no `cf-connecting-ip`; otherwise 503 |
+| Import downloads | SSRF via poll-returned URL | HTTPS only; exact allowlisted hosts (ACRA download host unverified → empty list → fail closed); IP literals/localhost rejected |
+| Active data | Mixed-generation reads, partial imports | Generation resolved once per request; activation is one batch; chunks commit with their cursor |
+| Auth tables | Replaced by an import | Importers write only source tables; tests assert users/sessions survive imports |
+
 ## Checklist
 
 ### Privacy

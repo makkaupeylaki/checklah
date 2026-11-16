@@ -1,0 +1,19 @@
+{"id":"NK-fixture-sg-person","schema":"Person","caption":"Fixture Person Singapore","datasets":["fixture_sanctions"],"referents":["fixture-old-1"],"first_seen":"2025-08-22T10:15:20+00:00","last_change":"2025-08-22T10:15:20+00:00","properties":{"name":["Fixture Person Singapore"],"alias":["Фикстура Персона","菲克斯"],"nationality":["sg","my"],"birthDate":["1982"],"topics":["sanction"],"passportNumber":["E0000000X"],"sourceUrl":["https://example.org/fixture/person"]}}
+{"id":"NK-fixture-pep","schema":"Person","caption":"Fixture PEP Citizen","datasets":["fixture_peps"],"properties":{"name":["Fixture PEP Citizen"],"citizenship":["sg"],"position":["Member, Fixture Council"],"topics":["role.pep"],"birthDate":["1970-03"]}}
+{"id":"NK-fixture-birth","schema":"Person","caption":"Fixture Born In Singapore","datasets":["fixture_crime"],"properties":{"name":["Fixture Born In Singapore"],"birthCountry":["sg"],"topics":["crime"]}}
+{"id":"NK-fixture-foreign","schema":"Person","caption":"Fixture Foreign Person","datasets":["fixture_sanctions"],"properties":{"name":["Fixture Foreign Person"],"nationality":["ru"],"topics":["sanction"]}}
+{"id":"NK-fixture-sg-sanctioned-foreigner","schema":"Person","caption":"Fixture Listed By Singapore","datasets":["fixture_sg_list"],"properties":{"name":["Fixture Listed By Singapore"],"nationality":["kp"],"notes":["Listed under a Singapore programme; mentions Singapore in text"],"topics":["sanction"]}}
+{"id":"NK-fixture-co","schema":"Company","caption":"Fixture Holdings Pte Ltd","datasets":["fixture_sanctions"],"properties":{"name":["Fixture Holdings Pte Ltd"],"jurisdiction":["sg"],"registrationNumber":["T99SY0001A"],"incorporationDate":["2010-01-05"],"topics":["sanction"]}}
+{"id":"NK-fixture-org","schema":"Organization","caption":"Fixture Association","datasets":["fixture_debar"],"properties":{"name":["Fixture Association"],"mainCountry":["sg"],"topics":["debarment"]}}
+{"id":"NK-fixture-entity","schema":"LegalEntity","caption":"Fixture Entity Country Only","datasets":["fixture_misc"],"properties":{"name":["Fixture Entity Country Only"],"country":["SG"]}}
+{"id":"sanc-1","schema":"Sanction","caption":"Sanction","datasets":["fixture_sanctions"],"properties":{"entity":["NK-fixture-sg-person"],"authority":["Fixture Authority"],"program":["Fixture Programme"],"country":["us"],"listingDate":["2024-02"],"reason":["<b>reason</b> text"],"sourceUrl":["javascript:alert(1)"]}}
+{"id":"sanc-2","schema":"Sanction","caption":"Sanction","datasets":["fixture_sg_list"],"properties":{"entity":["NK-fixture-sg-sanctioned-foreigner"],"authority":["Fixture Singapore Authority"],"country":["sg"]}}
+{"id":"pass-1","schema":"Passport","caption":"Passport","properties":{"holder":["NK-fixture-sg-person"],"number":["E0000000X"],"country":["sg"],"type":["passport"]}}
+{"id":"fam-1","schema":"Family","caption":"Family","properties":{"person":["NK-fixture-sg-person"],"relative":["NK-fixture-foreign"],"relationship":["sibling"]}}
+{"id":"dir-1","schema":"Directorship","caption":"Directorship","properties":{"director":["NK-fixture-pep"],"organization":["NK-fixture-co"],"role":["Director"]}}
+{"id":"pos-1","schema":"Position","caption":"Member, Fixture Council","properties":{"name":["Member, Fixture Council"],"country":["sg"]}}
+{"id":"occ-1","schema":"Occupancy","caption":"Occupancy","properties":{"holder":["NK-fixture-pep"],"post":["pos-1"]}}
+{"id":"vessel-1","schema":"Vessel","caption":"Fixture Vessel","properties":{"name":["Fixture Vessel"],"flag":["sg"],"country":["sg"]}}
+{"id":"weird-1","schema":"Person","caption":"Fixture Odd Properties","properties":{"name":["Fixture Odd Properties", null, 42],"nationality":"sg","country":[null,"sg"],"birthDate":["unknown"],"topics":null}}
+this is not json
+{"id":"NK-fixture-unicode","schema":"Person","caption":"José Ñúñez Fixture","properties":{"name":["José Ñúñez Fixture"],"nationality":["sg"],"weakAlias":["JN"],"previousName":["José Fixture"],"deathDate":["2020-02-02"]}}

@@ -1,6 +1,7 @@
 # CheckLah — requirements
 
 Status key: **[S1]** done in Stage 1 (demo), **[S2]** needs live sources, **[S3]** needs hosting decision.
+Stage 2 additions are in the "Stage 2" section at the end; they keep every S1 behaviour.
 
 ## Functional
 
@@ -81,3 +82,27 @@ Status key: **[S1]** done in Stage 1 (demo), **[S2]** needs live sources, **[S3]
 Phone numbers / scam-number lists, crowdsourced accusations, court judgments or scraped government
 pages, transliteration/fuzzy identity matching, directors/beneficial ownership, website safety
 verdicts, live URL fetching, analytics, deployment.
+
+## Stage 2 (Workers + D1, Singapore-first)
+
+- W1 Served backend is a TypeScript Worker with the native D1 binding; Vite/TS frontend unchanged in
+  look. Pinned toolchain + lockfile, explicit compatibility date, typed bindings, repeatable local migrations.
+- W2 Demo and live are separate Wrangler environments with separate D1 databases and local state
+  directories. Each database is stamped with its mode; a Worker whose `MODE` differs refuses to serve
+  (fail closed, no fallback).
+- W3 API shape kept (`/api/session`, `/api/login`, `/api/logout`, `/api/search` POST, `/api/record/:id`,
+  `/api/sources`). Search pagination becomes bounded keyset (`cursor`), over a deterministic order.
+- W4 Every query is bound to the source's active generation, resolved once per request.
+- W5 Sessions, CSRF and rate limits are durable in D1 (hashed tokens, expiry, per-user revocation,
+  prunable limiter rows); no process memory. Hosted (non-loopback) mode fails closed without auth.
+- W6 Search tiers: exact identifier → exact normalized name/alias → FTS token → FTS prefix →
+  "Possible similar name" (bounded rerank of a capped candidate set). No percentages.
+- W7 ACRA adapter: initiate-download → poll-download (finite budget) → validated HTTPS URL on a
+  verified host → streamed CSV; local file + manifest mode for offline runs.
+- W8 OpenSanctions adapter: streamed NDJSON, two bounded passes (select Singapore-linked subjects, then
+  collect their sanction/identification/relationship context); local file + manifest mode.
+- W9 Import lifecycle: idempotent import key, single-source lock, resumable chunks with a cursor
+  committed in the same batch, validation, atomic activation batch, one previous generation for
+  rollback, bounded cleanup with a grace period for in-flight reads.
+- W10 Daily refresh *policy* implemented but disabled (`REFRESH_ENABLED=false`, no cron trigger).
+  Separate `checked_at`, `upstream_export_at`, `imported_at`, `last_changed_at`; per-source staleness.
