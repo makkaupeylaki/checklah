@@ -26,7 +26,7 @@ const DATE_LABELS: Record<string, string> = {
 };
 const PROPERTY_LABELS: Record<string, string> = {
   programme: "Programme", position: "Position", notes: "Source notes", registry_status: "Registry status",
-  entity_type: "Entity type", listing_scope: "Listing scope", listing_status: "Listing status", threat_label: "Source label",
+  entity_type: "Registry entity type", listing_scope: "Listing scope", listing_status: "Listing status", threat_label: "Source label",
   issuance_agency: "Issuing agency", street: "Registered street", postal_code: "Registered postal code",
   sg_link: "Singapore link (field)", legal_form: "Legal form", gender: "Gender",
 };

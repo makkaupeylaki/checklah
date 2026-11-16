@@ -1,0 +1,81 @@
+{
+ "host": {
+  "cpus": 4,
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "ram_gb": 16,
+  "node": "v22.23.4"
+ },
+ "rows": 2133906,
+ "note": "Local workerd/Miniflare D1 on this machine. Not remote D1; not a capacity promise.",
+ "imports": [
+  {
+   "generation": 0,
+   "status": "imported",
+   "csv_mb": 211,
+   "seconds": 3620.5,
+   "rows_per_s": 589,
+   "rows_written_local_meta": 19215824,
+   "state_mb_after": 1537,
+   "node_peak_rss_mb": 781,
+   "workerd_peak_rss_mb": 612
+  }
+ ],
+ "latency": [
+  {
+   "label": "exact UEN",
+   "cold_ms": 24.5,
+   "p50_ms": 19.6,
+   "p95_ms": 24.2,
+   "max_ms": 25.4
+  },
+  {
+   "label": "exact name (2 tokens + suffix)",
+   "cold_ms": 104.7,
+   "p50_ms": 105.1,
+   "p95_ms": 134.1,
+   "max_ms": 146.5
+  },
+  {
+   "label": "token + prefix (2 tokens)",
+   "cold_ms": 93,
+   "p50_ms": 84,
+   "p95_ms": 114.5,
+   "max_ms": 126.4
+  },
+  {
+   "label": "common single token (capped)",
+   "cold_ms": 12.7,
+   "p50_ms": 13.2,
+   "p95_ms": 15.8,
+   "max_ms": 20.1
+  },
+  {
+   "label": "typo -> possible similar name",
+   "cold_ms": 26.3,
+   "p50_ms": 38.1,
+   "p95_ms": 51.9,
+   "max_ms": 58
+  },
+  {
+   "label": "record detail",
+   "cold_ms": 21,
+   "p50_ms": 16.7,
+   "p95_ms": 22.8,
+   "max_ms": 212.7
+  }
+ ],
+ "rows_read_local": {
+  "exact_uen": 3,
+  "exact_name": 95,
+  "fts_common_token_cap2000": 5999,
+  "fts_two_tokens": 5999
+ },
+ "state_mb_active_plus_previous": 1537,
+ "cleanup": {
+  "note": "retired generations only (none if <3 generations); active/previous kept",
+  "deleted_rows": 0,
+  "seconds": 0
+ },
+ "workerd_peak_rss_mb": 672,
+ "node_peak_rss_mb": 781
+}

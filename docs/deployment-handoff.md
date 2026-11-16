@@ -10,7 +10,7 @@ D1 creation, migration or import, no deploy, no domain or DNS change, no cron. E
 |---|---|---|
 | Use basis | Personal, non-commercial hobby use (owner, 16 Nov 2026) | Re-confirm the invited users understand it is not for work |
 | Plan | D1's storage/write allowances quoted in the packet are **Workers Paid** allowances. Login hashing (scrypt) needs more CPU than the Free plan's per-request budget | Which Cloudflare plan the existing account is on, and whether other apps already use D1 allowances |
-| Storage | Local measurement (synthetic ACRA scale): see `stage2-status.md` → *Benchmark*. Peak = staging + active + previous generations of ACRA, plus OpenSanctions subset, plus FTS and indexes | Does the measured peak fit under 5 GB *included account* storage (shared with other apps) and the 10 GB per-database maximum? If not: keep only one previous generation outside import windows, or drop ACRA history (`previous`) after a smoke test, or split ACRA into its own database |
+| Storage | **Measured locally (synthetic, 2.13M rows): 1.52 GB per ACRA generation incl. FTS and indexes → ≈ 3.0 GB steady state (active + previous) → ≈ 4.6 GB peak during an import** (`stage2-status.md` → *Benchmark*). Remote size not measured | **Likely NO-GO on included storage alone:** 4.6 GB is ~92 % of the 5 GB *included account* storage (shared with other apps), before OpenSanctions. It fits under the 10 GB per-database maximum, so the overage would be billed ($0.75/GB-month, packet [8]). Options: (a) drop the ACRA `previous` generation before a new import, giving a ≈ 3.0 GB peak but no rollback during that window; (b) drop the `names_entity` index (≈ 68 MB/gen) and FTS `docsize` (with `columnsize=0`, ≈ 28 MB/gen) after re-testing; (c) accept billed storage. Owner decision |
 | Writes | Estimate in §6 below; local `rows_written` is an approximation | Monthly writes vs 50M included (shared). Remote `rows_written` must be measured on the first real import |
 | Refresh runtime | A 2.13M-row CSV plus a multi-GB OpenSanctions export cannot be assumed to finish in one Cron invocation (15 min CPU/wall), and `waitUntil` adds at most 30 s | Run imports from an operator machine with the CLI (manual, monthly ACRA / daily-ish OpenSanctions), or approve an extra runtime (e.g. Queues/Workflows/R2 or an always-on runner). Both are owner decisions; neither was added |
 | Source contracts | ACRA download host, status values, metadata endpoint; OpenSanctions metadata and context property names are **unresolved** (`source-contracts.md`) | Run the live contract checks there first |
@@ -100,8 +100,8 @@ CLI compatibility mode) cannot be imported back into D1. Restore = base rows + `
 
 ## 6. Rows-written estimate (conservative range; replace with remote measurements)
 
-Basis: local D1 reported about **9 rows written per ACRA entity per import** (base rows plus index
-entries; FTS shadow-table writes may not be counted the same way remotely). Deletion of a retired
+Basis: local D1 reported **19,215,824 rows written for one 2,133,906-row ACRA import ≈ 9.0 per entity**
+(base rows plus index entries; FTS shadow-table writes may not be counted the same way remotely). Deletion of a retired
 generation is assumed to cost about the same again. Exact local figures are in `stage2-status.md`.
 
 | Item | Per event | Frequency | Monthly |
